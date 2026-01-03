@@ -7,13 +7,38 @@ interface ChatWindowProps {
   messages: Message[];
   onSendMessage: (text: string) => void;
   isLoading: boolean;
-  isLive: boolean;
-  onToggleLive: () => void;
 }
 
-export const ChatWindow: React.FC<ChatWindowProps> = ({ messages, onSendMessage, isLoading, isLive, onToggleLive }) => {
+export const ChatWindow: React.FC<ChatWindowProps> = ({ messages, onSendMessage, isLoading }) => {
   const [input, setInput] = useState('');
+  const [isRecording, setIsRecording] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<any>(null);
+
+  useEffect(() => {
+    // Initialize Speech Recognition
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = false;
+      recognitionRef.current.interimResults = false;
+      recognitionRef.current.lang = 'en-US';
+      
+      recognitionRef.current.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        setInput(transcript);
+        setIsRecording(false);
+      };
+      
+      recognitionRef.current.onerror = () => {
+        setIsRecording(false);
+      };
+      
+      recognitionRef.current.onend = () => {
+        setIsRecording(false);
+      };
+    }
+  }, []);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -29,6 +54,21 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ messages, onSendMessage,
     }
   };
 
+  const toggleRecording = () => {
+    if (!recognitionRef.current) {
+      alert('Speech recognition is not supported in your browser. Please use Chrome or Edge.');
+      return;
+    }
+    
+    if (isRecording) {
+      recognitionRef.current.stop();
+      setIsRecording(false);
+    } else {
+      recognitionRef.current.start();
+      setIsRecording(true);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl overflow-hidden shadow-2xl">
       <div className="p-4 border-b border-white/10 flex items-center justify-between">
@@ -41,19 +81,12 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ messages, onSendMessage,
             <p className="text-xs text-indigo-200">Personal Fashion Stylist</p>
           </div>
         </div>
-        <button 
-          onClick={onToggleLive}
-          className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${
-            isLive 
-              ? 'bg-red-500/20 text-red-400 border border-red-500/30' 
-              : 'bg-green-500/20 text-green-400 border border-green-500/30'
-          }`}
-        >
-          <div className={`w-2 h-2 rounded-full ${isLive ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></div>
-          <span className="text-[10px] font-bold uppercase tracking-wider">
-            {isLive ? 'End Session' : 'Start Live'}
+        <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-green-500/20 border border-green-500/30">
+          <div className="w-2 h-2 rounded-full bg-green-500"></div>
+          <span className="text-[10px] font-bold uppercase tracking-wider text-green-400">
+            Voice Active
           </span>
-        </button>
+        </div>
       </div>
 
       <div 
@@ -88,12 +121,24 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({ messages, onSendMessage,
       </div>
 
       <form onSubmit={handleSubmit} className="p-4 bg-white/5 border-t border-white/10 flex gap-2 items-center">
+        <button
+          type="button"
+          onClick={toggleRecording}
+          className={`w-11 h-11 rounded-full flex items-center justify-center transition-all shadow-lg ${
+            isRecording 
+              ? 'bg-red-500 animate-pulse' 
+              : 'bg-white/10 hover:bg-white/20'
+          }`}
+        >
+          <Icons.Mic />
+        </button>
+        
         <input 
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={isLive ? "Speak now or type..." : "Start live session to talk..."}
-          className={`w-full bg-white/10 border border-white/10 rounded-full px-5 py-2.5 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all`}
+          placeholder={isRecording ? "Listening..." : "Ask Aria for styling advice..."}
+          className="w-full bg-white/10 border border-white/10 rounded-full px-5 py-2.5 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
         />
         
         <button 
